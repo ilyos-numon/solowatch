@@ -1,0 +1,33 @@
+:root {
+  --font-anthropic-sans: "Noto Sans KR", system-ui, -apple-system, sans-serif;
+  --font-anthropic-serif: "Noto Serif KR", Georgia, serif;
+  --cds-font-size-caption: 12.5px; --cds-font-size-body: 14.5px; --cds-font-size-heading: 16.5px; --cds-font-size-title: 26px;
+  --cds-font-weight-medium: 500;
+  --cds-gap-xs: 4px; --cds-gap-sm: 8px; --cds-gap-md: 16px; --cds-gap-lg: 24px; --cds-gap-xl: 32px;
+  --cds-pad-xs: 4px; --cds-pad-sm: 8px; --cds-pad-md: 14px; --cds-pad-lg: 20px; --cds-pad-xl: 28px;
+  --cds-radius: 8px; --cds-dur-slow: 320ms; --cds-ease-out: cubic-bezier(.2,.8,.2,1);
+  --color-fg: #1f1e1c; --color-fg-muted: #6b6862; --color-bg: #ffffff; --color-panel: #f7f6f3; --color-border-line: #e4e1da;
+  --color-ok: #1f8a6e; --color-warn: #c2620a; --color-bad: #c43b3b;
+  --cds-chart-muted: #c9c5bc; --cds-chart-grid: #ece9e3; --cds-chart-axis: #b9b5ad;
+  --cds-surface-popover: #ffffff; --cds-border: #e4e1da; --cds-shadow-popover: 0 6px 20px -8px rgba(0,0,0,.25); --cds-text-secondary: #6b6862;
+  --c1: #2f6fd6; --c2: #1f8a6e; --c3: #8a5cd1; --c4: #c2620a;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-fg: #ecebe8; --color-fg-muted: #a19e97; --color-bg: #1b1a18; --color-panel: #232220; --color-border-line: #3a3834;
+    --color-ok: #4cc29f; --color-warn: #f09a4a; --color-bad: #f07272;
+    --cds-chart-muted: #5b5852; --cds-chart-grid: #2e2d2a; --cds-chart-axis: #55524c;
+    --cds-surface-popover: #2a2926; --cds-border: #3a3834; --cds-shadow-popover: 0 6px 20px -8px rgba(0,0,0,.6); --cds-text-secondary: #a19e97;
+    --c1: #6fa1f2; --c2: #4cc29f; --c3: #b18ef0; --c4: #f09a4a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --color-fg: #ecebe8; --color-fg-muted: #a19e97; --color-bg: #1b1a18; --color-panel: #232220; --color-border-line: #3a3834;
+  --color-ok: #4cc29f; --color-warn: #f09a4a; --color-bad: #f07272;
+  --cds-chart-muted: #5b5852; --cds-chart-grid: #2e2d2a; --cds-chart-axis: #55524c;
+  --cds-surface-popover: #2a2926; --cds-border: #3a3834; --cds-shadow-popover: 0 6px 20px -8px rgba(0,0,0,.6); --cds-text-secondary: #a19e97;
+  --c1: #6fa1f2; --c2: #4cc29f; --c3: #b18ef0; --c4: #f09a4a;
+  color-scheme: dark;
+}
