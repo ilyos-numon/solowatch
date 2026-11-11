@@ -1,0 +1,95 @@
+# 홀로안심 로컬 Supabase (CLI 스택). 포트는 루트 docs/ports.md 의 573xx 배정.
+project_id = "solowatch"
+
+[api]
+enabled = true
+port = 57321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[api.tls]
+enabled = false
+
+[db]
+port = 57322
+shadow_port = 57320
+health_timeout = "2m"
+major_version = 17
+
+[db.pooler]
+enabled = false
+port = 57329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 57323
+api_url = "http://localhost"
+
+# 로컬 메일함 (Mailpit). 메일은 밖으로 나가지 않는다.
+[local_smtp]
+enabled = true
+port = 57324
+
+[storage]
+enabled = false
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:8840"
+additional_redirect_urls = ["http://localhost:8841"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+minimum_password_length = 6
+password_requirements = ""
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false
+
+# Edge Functions: 웹 푸시 push-alert 만 쓴다 (inspector 57383 은 예약만).
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+inspector_port = 57383
+deno_version = 2
+
+[functions.push-alert]
+verify_jwt = false
+
+[analytics]
+enabled = false
+port = 57327
+backend = "postgres"
