@@ -1,0 +1,26 @@
+# 홀로안심 가정 내 데몬. install.sh 가 /etc/systemd/system/solowatch.service 로 복사한다.
+# 수집·탐지는 이 기기 안에서만 돈다. 집 밖으로 나가는 것은 알림 문장과 일일 요약뿐이다.
+[Unit]
+Description=SoloWatch home daemon (MQTT ingest, rhythm anomaly detection, family alerts)
+Wants=network-online.target
+After=network-online.target mosquitto.service
+
+[Service]
+Type=simple
+User=solowatch
+Group=solowatch
+WorkingDirectory=/var/lib/solowatch
+EnvironmentFile=/etc/solowatch/solowatch.env
+ExecStart=/opt/solowatch/.venv/bin/solowatch daemon --config /etc/solowatch/solowatch.toml
+Restart=on-failure
+RestartSec=10
+# exit 2 = 설정·env 누락: 고칠 때까지 재시작하지 않는다 (journalctl 로 누락 이름 확인)
+RestartPreventExitStatus=2
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/solowatch
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

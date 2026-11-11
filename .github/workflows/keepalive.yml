@@ -1,0 +1,29 @@
+name: keepalive
+
+# Wakes the demo every 3 days so the free Supabase project is not paused for inactivity.
+on:
+  schedule:
+    - cron: '0 3 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    env:
+      DEMO_URL: ${{ vars.DEMO_URL }}
+    steps:
+      - name: Ping demo state
+        run: |
+          if [ -z "$DEMO_URL" ]; then
+            echo "::notice::DEMO_URL is not set; keepalive skipped"
+            exit 0
+          fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "${DEMO_URL%/}/api/demo/state" || true)
+          echo "GET /api/demo/state -> $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::${DEMO_URL%/}/api/demo/state returned $code"
+            exit 1
+          fi

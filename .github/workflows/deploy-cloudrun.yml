@@ -1,0 +1,137 @@
+name: deploy-cloudrun
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: deploy-cloudrun
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      DEPLOY_SA: ${{ vars.GCP_DEPLOY_SA }}
+      SERVICE: solowatch-demo
+    steps:
+      - name: Check variables
+        id: gate
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$PROJECT_ID" ] || [ -z "$WIF_PROVIDER" ]; then
+            echo "::notice::GCP_PROJECT_ID or GCP_WIF_PROVIDER is not set; deploy skipped"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$REGION" ] || [ -z "$DEPLOY_SA" ]; then
+            echo "::error::variables GCP_REGION and GCP_DEPLOY_SA must be set"
+            exit 1
+          fi
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error::variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set"
+            exit 1
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: steps.gate.outputs.enabled == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - if: steps.gate.outputs.enabled == 'true'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      # Build args are public values only: they are baked into the browser bundle.
+      - name: Build and push image
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_DEMO_EMAIL: ${{ vars.VITE_DEMO_EMAIL }}
+          VITE_DEMO_PASSWORD: ${{ vars.VITE_DEMO_PASSWORD }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+        run: |
+          image="$REGION-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$SERVICE:$GITHUB_SHA"
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker build -t "$image" \
+            --build-arg VITE_SUPABASE_URL \
+            --build-arg VITE_SUPABASE_ANON_KEY \
+            --build-arg VITE_DEMO_EMAIL \
+            --build-arg VITE_DEMO_PASSWORD \
+            --build-arg VITE_VAPID_PUBLIC_KEY \
+            .
+          docker push "$image"
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+
+      # No env/secret flags: the env set by the first manual deploy (deploy/cloudrun.md) is kept.
+      - name: Deploy to Cloud Run
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --allow-unauthenticated \
+            --port 8080 \
+            --cpu 1 \
+            --memory 1Gi \
+            --min-instances 0 \
+            --max-instances 1 \
+            --concurrency 20 \
+            --timeout 300 \
+            --cpu-boost \
+            --quiet
+
+      - name: Check revision and env names
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          rev=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.latestReadyRevisionName)')
+          if [ -z "$rev" ]; then
+            echo "::error::latest ready revision not found"
+            exit 1
+          fi
+          echo "revision=$rev"
+          echo "REV=$rev" >> "$GITHUB_ENV"
+          # Only env names are read; values are never printed.
+          names=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(spec.template.spec.containers[0].env[].name)' | tr ';,' '\n')
+          missing=0
+          for n in SUPABASE_URL SUPABASE_ANON_KEY SOLOWATCH_DEVICE_EMAIL SOLOWATCH_DEVICE_PASSWORD SUPABASE_SERVICE_ROLE_KEY; do
+            if ! printf '%s\n' "$names" | grep -qx "$n"; then
+              echo "::error::env name $n is missing on $SERVICE"
+              missing=1
+            fi
+          done
+          [ "$missing" = 0 ] || exit 1
+          echo "all 5 env names present"
+
+      - name: Wait for health
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')
+          if [ -z "$url" ]; then
+            echo "::error::service URL not found"
+            exit 1
+          fi
+          echo "url=$url"
+          # Cloud Run 은 /healthz 경로를 프런트엔드에서 막으므로 상태 API 의 ready 를 본다
+          for i in $(seq 1 20); do
+            ready=$(curl -s "$url/api/demo/state" | jq -r '.ready // empty' 2>/dev/null || true)
+            echo "poll $i: ready=$ready"
+            if [ "$ready" = "true" ]; then
+              echo "Deployed: $url/demo ($REV)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::$url/api/demo/state not ready within 5 minutes"
+          exit 1
